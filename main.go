@@ -13,7 +13,6 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-// NetworkMetrics is one metrics event for a network service (fictional demo data).
 type NetworkMetrics struct {
 	ServiceId      string `json:"serviceId"`
 	Timestamp      string `json:"timestamp"`
@@ -24,6 +23,7 @@ type NetworkMetrics struct {
 }
 
 func main() {
+
 	serviceCert, err := os.ReadFile("/service.cert")
 	if err != nil {
 		log.Fatalf("Failed to load SERVICE_CERT: %s", err)
@@ -41,9 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load access key and/or access certificate: %s", err)
 	}
+
 	caCertPool := x509.NewCertPool()
-	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
-		log.Fatalf("Failed to parse CA certificate")
+	ok := caCertPool.AppendCertsFromPEM(caCert)
+	if !ok {
+		log.Fatalf("Failed to parse CA certificate from environment variable")
 	}
 
 	dialer := &kafka.Dialer{
@@ -63,7 +65,6 @@ func main() {
 	if topicName == "" {
 		log.Fatalf("Environment variable 'TOPIC_NAME' not set")
 	}
-
 	producer := kafka.NewWriter(kafka.WriterConfig{
 		Brokers: []string{serviceURI},
 		Topic:   topicName,
@@ -71,7 +72,7 @@ func main() {
 	})
 	defer producer.Close()
 
-	// POST /publish-metrics publishes one network metrics event to the Kafka topic.
+	// Below endpoint will publish the network metrics of a certain service
 	http.HandleFunc("/publish-metrics", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -83,9 +84,6 @@ func main() {
 			http.Error(w, "Invalid request payload", http.StatusBadRequest)
 			return
 		}
-		if data.ServiceId == "" {
-			data.ServiceId = "SVC-10045"
-		}
 		if data.Timestamp == "" {
 			data.Timestamp = time.Now().UTC().Format(time.RFC3339)
 		}
@@ -95,24 +93,23 @@ func main() {
 			http.Error(w, "Failed to marshal JSON data", http.StatusInternalServerError)
 			return
 		}
-		if err := producer.WriteMessages(context.Background(), kafka.Message{
-			Key:   []byte(data.ServiceId),
-			Value: jsonData,
-		}); err != nil {
+		err = producer.WriteMessages(context.Background(), kafka.Message{Value: jsonData})
+		if err != nil {
 			log.Printf("Failed to send message: %s", err)
 			http.Error(w, "Failed to send message", http.StatusInternalServerError)
 			return
 		}
-
 		log.Printf("Message sent: %s", jsonData)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		w.WriteHeader(http.StatusOK)
+		response := map[string]string{
 			"status":  "success",
-			"message": "Network metrics event published",
+			"message": "Network metrics published successfully",
 			"values":  string(jsonData),
-		})
+		}
+		json.NewEncoder(w).Encode(response)
 	})
 
+	// Start the server on port 9090
 	log.Println("Server starting on port 9090...")
 	log.Fatal(http.ListenAndServe(":9090", nil))
 }

@@ -1,4 +1,4 @@
-module network-metrics-producer
+module github.com/wso2/choreo-sample-apps/kafka/producer
 
 go 1.23.3
 
