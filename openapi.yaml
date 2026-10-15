@@ -1,0 +1,53 @@
+openapi: 3.0.1
+info:
+  title: Network Metrics Producer API
+  version: 1.0.0
+  description: Publishes fictional network performance metrics events to Kafka (demo only).
+paths:
+  /publish-metrics:
+    post:
+      summary: Publish a network metrics event
+      operationId: publishMetrics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkMetrics'
+            example:
+              serviceId: SVC-10045
+              bytesIn: 48213377
+              bytesOut: 39117204
+              droppedPackets: 12
+              fcsErrors: 3
+      responses:
+        '200':
+          description: Event published
+        '400':
+          description: Invalid request payload
+        '500':
+          description: Failed to publish to Kafka
+components:
+  schemas:
+    NetworkMetrics:
+      type: object
+      properties:
+        serviceId:
+          type: string
+          example: SVC-10045
+        timestamp:
+          type: string
+          format: date-time
+          description: Optional. Defaults to the current time if omitted.
+        bytesIn:
+          type: integer
+          format: int64
+        bytesOut:
+          type: integer
+          format: int64
+        droppedPackets:
+          type: integer
+          format: int64
+        fcsErrors:
+          type: integer
+          format: int64
